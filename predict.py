@@ -216,7 +216,31 @@ def predict(model, image_tensor, idx_to_class, device=None):
         confidence, pred_idx = torch.max(probabilities, dim=0)
     
     # Get class name
-    pred_class = idx_to_class[pred_idx.item()]
+    pred_idx_value = pred_idx.item()
+    
+    # Debug output
+    print(f"Prediction index: {pred_idx_value}")
+    print(f"Available class indices: {list(idx_to_class.keys())}")
+    
+    # Convert index to class name
+    if isinstance(idx_to_class, dict):
+        # If idx_to_class is a dictionary mapping indices to class names
+        if pred_idx_value in idx_to_class:
+            pred_class = idx_to_class[pred_idx_value]
+        else:
+            # Handle case where idx_to_class might be in reverse format (class name -> index)
+            # This is for backward compatibility
+            orientation_map = {0: 'front', 1: 'left', 2: 'rear', 3: 'right'}
+            pred_class = orientation_map.get(pred_idx_value, 'unknown')
+    else:
+        # If idx_to_class is a list
+        if 0 <= pred_idx_value < len(idx_to_class):
+            pred_class = idx_to_class[pred_idx_value]
+        else:
+            orientation_map = {0: 'front', 1: 'left', 2: 'rear', 3: 'right'}
+            pred_class = orientation_map.get(pred_idx_value, 'unknown')
+    
+    print(f"Predicted class: {pred_class}, Confidence: {confidence.item()}")
     
     return pred_class, confidence.item()
 

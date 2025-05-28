@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verification Complete</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+            padding-bottom: 40px;
+        }
+        .container {
+            max-width: 800px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .result-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        .result-card-header {
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+        }
+        .success-header {
+            background-color: #198754;
+        }
+        .warning-header {
+            background-color: #ffc107;
+        }
+        .danger-header {
+            background-color: #dc3545;
+        }
+        .result-card-body {
+            padding: 20px;
+        }
+        .license-plate {
+            background-color: #ffc107;
+            color: #212529;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin: 5px 0;
+        }
+        .verification-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .verification-success {
+            background-color: rgba(25, 135, 84, 0.1);
+            border-left: 4px solid #198754;
+        }
+        .verification-failure {
+            background-color: rgba(220, 53, 69, 0.1);
+            border-left: 4px solid #dc3545;
+        }
+        .verification-warning {
+            background-color: rgba(255, 193, 7, 0.1);
+            border-left: 4px solid #ffc107;
+        }
+        .form-buttons {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .btn-primary {
+            background-color: #0d6efd;
+            border: none;
+        }
+        .btn-primary:hover {
+            background-color: #0b5ed7;
+        }
+        .summary-card {
+            border-radius: 15px;
+            background-color: #0d6efd;
+            color: white;
+            margin-bottom: 30px;
+            padding: 20px;
+        }
+        .summary-item {
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Verification Complete</h2>
+            <p>Summary of all verification results</p>
+        </div>
+
+        <div class="summary-card">
+            <h4>Summary</h4>
+            <div class="summary-item">
+                <h5>License Plate Detection</h5>
+                {% if vehicle_plate %}
+                    <p>Towed vehicle license plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
+                {% else %}
+                    <p>No license plate detected for the towed vehicle.</p>
+                {% endif %}
+
+                {% if towing_truck_plate %}
+                    <p>Towing truck license plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
+                {% else %}
+                    <p>No license plate detected for the towing truck.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="result-card">
+            <div class="result-card-header {% if vehicle_verified %}success-header{% else %}danger-header{% endif %}">
+                Vehicle Orientation Verification
+            </div>
+            <div class="result-card-body">
+                {% if vehicle_verified %}
+                    <div class="verification-item verification-success">
+                        <h5><i class="bi bi-check-circle"></i> Vehicle orientation verified</h5>
+                        <p>All vehicle images (front, rear, left, right) have been successfully verified.</p>
+                    </div>
+                {% else %}
+                    <div class="verification-item verification-failure">
+                        <h5><i class="bi bi-x-circle"></i> Vehicle orientation verification failed</h5>
+                        <p>One or more vehicle orientations could not be verified. Please check the images and try again.</p>
+                    </div>
+                {% endif %}
+
+                {% if vehicle_plate %}
+                    <div class="verification-item verification-success">
+                        <h5><i class="bi bi-check-circle"></i> Vehicle license plate detected</h5>
+                        <p>License plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
+                    </div>
+                {% else %}
+                    <div class="verification-item verification-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> No vehicle license plate detected</h5>
+                        <p>The system could not detect a license plate in the vehicle images.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="result-card">
+            <div class="result-card-header {% if towing_truck_plate %}success-header{% else %}warning-header{% endif %}">
+                Towing Verification
+            </div>
+            <div class="result-card-body">
+                {% if vehicle_plate and towing_truck_plate %}
+                    <div class="verification-item verification-success">
+                        <h5><i class="bi bi-check-circle"></i> Both license plates detected</h5>
+                        <p>The system successfully detected both the vehicle and towing truck license plates.</p>
+                    </div>
+                    <div class="row mt-3">
+                        <div class="col-md-6">
+                            <h6>Vehicle License Plate:</h6>
+                            <span class="license-plate">{{ vehicle_plate }}</span>
+                        </div>
+                        <div class="col-md-6">
+                            <h6>Towing Truck License Plate:</h6>
+                            <span class="license-plate">{{ towing_truck_plate }}</span>
+                        </div>
+                    </div>
+                    
+                    {% if vehicle_plate == towing_truck_plate %}
+                        <div class="verification-item verification-warning mt-3">
+                            <h5><i class="bi bi-exclamation-triangle"></i> License plates match</h5>
+                            <p>The vehicle and towing truck have the same license plate. This might indicate an error or that the same vehicle is shown in both images.</p>
+                        </div>
+                    {% else %}
+                        <div class="verification-item verification-success mt-3">
+                            <h5><i class="bi bi-check-circle"></i> License plates are different</h5>
+                            <p>The vehicle and towing truck have different license plates, confirming they are separate vehicles.</p>
+                        </div>
+                    {% endif %}
+                {% elif towing_truck_plate %}
+                    <div class="verification-item verification-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Only towing truck license plate detected</h5>
+                        <p>Towing truck license plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
+                        <p>No vehicle license plate was detected.</p>
+                    </div>
+                {% elif vehicle_plate %}
+                    <div class="verification-item verification-warning">
+                        <h5><i class="bi bi-exclamation-triangle"></i> Only vehicle license plate detected</h5>
+                        <p>Vehicle license plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
+                        <p>No towing truck license plate was detected.</p>
+                    </div>
+                {% else %}
+                    <div class="verification-item verification-failure">
+                        <h5><i class="bi bi-x-circle"></i> No license plates detected</h5>
+                        <p>The system could not detect any license plates in the towing images.</p>
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="form-buttons">
+            <a href="{{ url_for('index') }}" class="btn btn-primary">Start New Verification</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

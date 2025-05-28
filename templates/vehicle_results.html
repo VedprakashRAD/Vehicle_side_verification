@@ -1,0 +1,186 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehicle Verification Results</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            background-color: #f8f9fa;
+            padding-top: 20px;
+            padding-bottom: 40px;
+        }
+        .container {
+            max-width: 1100px;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .header h2 {
+            color: #0d6efd;
+            font-weight: bold;
+        }
+        .result-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+            height: 100%;
+        }
+        .result-card-header {
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+            font-weight: bold;
+            text-align: center;
+            color: white;
+        }
+        .success {
+            background-color: #198754;
+        }
+        .failure {
+            background-color: #dc3545;
+        }
+        .result-card-body {
+            padding: 20px;
+        }
+        .result-image {
+            width: 100%;
+            height: 200px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .result-image img {
+            max-width: 100%;
+            max-height: 100%;
+        }
+        .license-plate {
+            background-color: #ffc107;
+            color: #212529;
+            font-weight: bold;
+            padding: 8px 15px;
+            border-radius: 20px;
+            display: inline-block;
+            margin-top: 10px;
+        }
+        .confidence {
+            margin-top: 10px;
+            font-size: 0.9rem;
+        }
+        .form-buttons {
+            text-align: center;
+            margin-top: 30px;
+        }
+        .summary-card {
+            border-radius: 15px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            margin-bottom: 30px;
+        }
+        .summary-card-header {
+            background-color: #0d6efd;
+            color: white;
+            padding: 15px;
+            border-radius: 15px 15px 0 0;
+            font-weight: bold;
+        }
+        .summary-card-body {
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h2>Vehicle Verification Results</h2>
+            <p>AI-verified results for your vehicle images</p>
+        </div>
+
+        <div class="summary-card">
+            <div class="summary-card-header">
+                Summary
+            </div>
+            <div class="summary-card-body">
+                {% set all_verified = true %}
+                {% for orientation, result in verification.items() %}
+                    {% if not result.is_correct %}
+                        {% set all_verified = false %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if all_verified %}
+                    <div class="alert alert-success">
+                        <h4 class="alert-heading">Verification Successful!</h4>
+                        <p>All vehicle orientations have been successfully verified.</p>
+                    </div>
+                {% else %}
+                    <div class="alert alert-danger">
+                        <h4 class="alert-heading">Verification Failed!</h4>
+                        <p>One or more vehicle orientations could not be verified. Please check the details below.</p>
+                    </div>
+                {% endif %}
+                
+                <h5 class="mt-3">License Plate Detection</h5>
+                {% set detected_plates = [] %}
+                {% for orientation, plate in license_plates.items() %}
+                    {% if plate %}
+                        {% if plate not in detected_plates %}
+                            {% set detected_plates = detected_plates + [plate] %}
+                        {% endif %}
+                    {% endif %}
+                {% endfor %}
+                
+                {% if detected_plates %}
+                    <p>Detected license plate: <span class="license-plate">{{ detected_plates[0] }}</span></p>
+                {% else %}
+                    <p>No license plate detected.</p>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="row">
+            {% for orientation, result in verification.items() %}
+                <div class="col-md-6 col-lg-3 mb-4">
+                    <div class="result-card">
+                        <div class="result-card-header {% if result.is_correct %}success{% else %}failure{% endif %}">
+                            {{ orientation|capitalize }} View
+                            {% if result.is_correct %}
+                                <span class="badge bg-white text-success">Verified</span>
+                            {% else %}
+                                <span class="badge bg-white text-danger">Failed</span>
+                            {% endif %}
+                        </div>
+                        <div class="result-card-body">
+                            <div class="result-image">
+                                <img src="/{{ result.filepath }}" alt="{{ orientation }} view">
+                            </div>
+                            <div class="confidence">
+                                Confidence: {{ "%.2f"|format(result.confidence * 100) }}%
+                            </div>
+                            {% if license_plates[orientation] %}
+                                <div class="mt-2">
+                                    License Plate: <span class="license-plate">{{ license_plates[orientation] }}</span>
+                                </div>
+                            {% else %}
+                                <div class="mt-2 text-muted">
+                                    No license plate detected
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        <div class="form-buttons">
+            <a href="{{ url_for('vehicle_verification') }}" class="btn btn-secondary me-2">Try Again</a>
+            <a href="{{ url_for('towing_verification') }}" class="btn btn-primary">Continue to Towing Verification</a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html> 

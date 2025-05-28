@@ -91,6 +91,21 @@ python export_model.py --model models/ensemble_model.pth --format h5
 ./improve_model.sh
 ```
 
+## Using Your Trained Model
+
+The app is designed to work with your trained PyTorch ensemble model (EfficientNet B7, ConvNext Small, and DenseNet201). To use your model:
+
+1. Run the conversion script:
+   ```bash
+   ./convert_model.sh --model models/ensemble_model.pth
+   ```
+
+2. The script will try different conversion methods and update the app's model files.
+
+3. For detailed instructions, see:
+   - [Using Your Trained Model](vehicle_inspection_app/USING_TRAINED_MODEL.md)
+   - [Model Conversion Process](MODEL_CONVERSION.md)
+
 ## Files
 
 - `train_full_dataset.py`: Script for training the model
