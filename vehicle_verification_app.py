@@ -233,9 +233,17 @@ def vehicle_verification():
                     'model_comparison': model_comparison
                 }
                 
-                # Extract license plate
-                license_plate = extract_license_plates(filepath)
-                license_plates[orientation] = license_plate
+                # Extract license plate - prioritize front and rear views for license plate detection
+                if orientation in ['front', 'rear']:
+                    license_plate = extract_license_plates(filepath)
+                    if license_plate:
+                        print(f"Detected license plate from {orientation} view: {license_plate}")
+                        license_plates[orientation] = license_plate
+                else:
+                    # For left/right views, still attempt detection but with lower priority
+                    license_plate = extract_license_plates(filepath)
+                    if license_plate:
+                        license_plates[orientation] = license_plate
                 
                 vehicle_images[orientation] = filename
         
@@ -337,20 +345,24 @@ def complete():
     vehicle_plates = session.get('license_plates', {})
     towing_plates = session.get('towing_license_plates', {})
     
-    # Get vehicle plate - prioritize the one from vehicle verification
-    vehicle_plate = None
-    if vehicle_plates:
+    # Get front license plate from vehicle verification
+    front_plate = vehicle_plates.get('front')
+    
+    # Get rear license plate from vehicle verification
+    rear_plate = vehicle_plates.get('rear')
+    
+    # Get towed vehicle plate - prioritize the one from towing verification
+    towed_vehicle_plate = towing_plates.get('towed_vehicle')
+    
+    # If no towed vehicle plate from towing verification, try the one detected from the rear image (top plate)
+    if not towed_vehicle_plate:
+        towed_vehicle_plate = towing_plates.get('towed_vehicle_from_rear')
+    
+    # If still no plate, try the one from vehicle verification (front or rear)
+    if not towed_vehicle_plate:
         # Find most common license plate from vehicle images
         all_plates = [plate for plate in vehicle_plates.values() if plate]
-        vehicle_plate = max(set(all_plates), key=all_plates.count) if all_plates else None
-    
-    # If no vehicle plate from vehicle verification, try the one from towing verification
-    if not vehicle_plate:
-        vehicle_plate = towing_plates.get('towed_vehicle')
-        
-        # If still no plate, try the one detected from the rear image (top plate)
-        if not vehicle_plate:
-            vehicle_plate = towing_plates.get('towed_vehicle_from_rear')
+        towed_vehicle_plate = max(set(all_plates), key=all_plates.count) if all_plates else None
     
     # Get towing truck plate
     towing_truck_plate = towing_plates.get('towing_truck')
@@ -362,12 +374,16 @@ def complete():
     # Print debug info
     print(f"Vehicle plates: {vehicle_plates}")
     print(f"Towing plates: {towing_plates}")
-    print(f"Selected vehicle plate: {vehicle_plate}")
-    print(f"Selected towing truck plate: {towing_truck_plate}")
+    print(f"Front plate: {front_plate}")
+    print(f"Rear plate: {rear_plate}")
+    print(f"Towed vehicle plate: {towed_vehicle_plate}")
+    print(f"Towing truck plate: {towing_truck_plate}")
     
     return render_template('complete.html',
                           vehicle_verified=vehicle_verified,
-                          vehicle_plate=vehicle_plate,
+                          front_plate=front_plate,
+                          rear_plate=rear_plate,
+                          vehicle_plate=towed_vehicle_plate,
                           towing_truck_plate=towing_truck_plate)
 
 if __name__ == '__main__':

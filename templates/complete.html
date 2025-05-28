@@ -93,6 +93,16 @@
         .summary-item {
             margin-bottom: 10px;
         }
+        .front-plate {
+            background-color: #20c997;
+        }
+        .rear-plate {
+            background-color: #6f42c1;
+            color: white;
+        }
+        .towing-plate {
+            background-color: #fd7e14;
+        }
     </style>
 </head>
 <body>
@@ -105,14 +115,22 @@
         <div class="summary-card">
             <h4>License Plate Information</h4>
             <div class="summary-item">
+                {% if front_plate %}
+                    <p>Front View License Plate: <span class="license-plate front-plate">{{ front_plate }}</span></p>
+                {% endif %}
+
+                {% if rear_plate %}
+                    <p>Rear View License Plate: <span class="license-plate rear-plate">{{ rear_plate }}</span></p>
+                {% endif %}
+
                 {% if vehicle_plate %}
-                    <p>Towed vehicle license plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
+                    <p>Towed Vehicle License Plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
                 {% else %}
                     <p>No license plate detected for the towed vehicle.</p>
                 {% endif %}
 
                 {% if towing_truck_plate %}
-                    <p>Towing truck license plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
+                    <p>Towing Truck License Plate: <span class="license-plate towing-plate">{{ towing_truck_plate }}</span></p>
                 {% else %}
                     <p>No license plate detected for the towing truck.</p>
                 {% endif %}
@@ -148,17 +166,27 @@
                     </div>
                 {% endif %}
 
-                {% if vehicle_plate %}
-                    <div class="verification-item verification-success">
-                        <h5><i class="bi bi-check-circle"></i> Vehicle license plate detected</h5>
-                        <p>License plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
-                    </div>
-                {% else %}
-                    <div class="verification-item verification-warning">
-                        <h5><i class="bi bi-exclamation-triangle"></i> No vehicle license plate detected</h5>
-                        <p>The system could not detect a license plate in the vehicle images.</p>
-                    </div>
-                {% endif %}
+                <div class="verification-item {% if front_plate or rear_plate %}verification-success{% else %}verification-warning{% endif %}">
+                    <h5>
+                        {% if front_plate or rear_plate %}
+                            <i class="bi bi-check-circle"></i> Vehicle license plate detected
+                        {% else %}
+                            <i class="bi bi-exclamation-triangle"></i> No vehicle license plate detected
+                        {% endif %}
+                    </h5>
+                    
+                    {% if front_plate %}
+                        <p>Front license plate: <span class="license-plate front-plate">{{ front_plate }}</span></p>
+                    {% endif %}
+                    
+                    {% if rear_plate %}
+                        <p>Rear license plate: <span class="license-plate rear-plate">{{ rear_plate }}</span></p>
+                    {% endif %}
+                    
+                    {% if not front_plate and not rear_plate %}
+                        <p>The system could not detect a license plate in the front or rear vehicle images.</p>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
@@ -174,12 +202,12 @@
                     </div>
                     <div class="row mt-3">
                         <div class="col-md-6">
-                            <h6>Vehicle License Plate:</h6>
+                            <h6>Towed Vehicle License Plate:</h6>
                             <span class="license-plate">{{ vehicle_plate }}</span>
                         </div>
                         <div class="col-md-6">
                             <h6>Towing Truck License Plate:</h6>
-                            <span class="license-plate">{{ towing_truck_plate }}</span>
+                            <span class="license-plate towing-plate">{{ towing_truck_plate }}</span>
                         </div>
                     </div>
                     
@@ -197,7 +225,7 @@
                 {% elif towing_truck_plate %}
                     <div class="verification-item verification-warning">
                         <h5><i class="bi bi-exclamation-triangle"></i> Only towing truck license plate detected</h5>
-                        <p>Towing truck license plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
+                        <p>Towing truck license plate: <span class="license-plate towing-plate">{{ towing_truck_plate }}</span></p>
                         <p>No vehicle license plate was detected.</p>
                     </div>
                 {% elif vehicle_plate %}
