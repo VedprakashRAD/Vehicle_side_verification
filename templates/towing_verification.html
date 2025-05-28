@@ -138,8 +138,8 @@
             <div class="info-card-body">
                 <p>Please upload two clear images showing:</p>
                 <ol>
-                    <li><strong>Towed Vehicle Image:</strong> The vehicle (car/bike) being towed with its license plate clearly visible</li>
-                    <li><strong>Towing Truck Image:</strong> The back view of the towing truck showing both the towing truck's license plate and the towed vehicle</li>
+                    <li><strong>Towed Vehicle Image (Left or Right Side After Tow):</strong> The vehicle (car/bike) being towed with its license plate clearly visible from left or right side</li>
+                    <li><strong>Towing Truck Image (Vehicle From Back Side):</strong> The back view of the towing truck showing both the towing truck's license plate and the towed vehicle</li>
                 </ol>
                 <p>The system will automatically detect both license plates using OCR technology.</p>
                 <div class="alert alert-info">
@@ -165,7 +165,7 @@
                 <div class="col-md-6 mb-4">
                     <div class="upload-card">
                         <div class="upload-card-header">
-                            Towed Vehicle Image
+                            Towed Vehicle Image (Left or Right Side After Tow)
                         </div>
                         <div class="upload-card-body">
                             <div class="upload-preview" id="towing-front-preview">
@@ -176,7 +176,7 @@
                                 </div>
                             </div>
                             <input type="file" class="form-control" id="towing-front-input" name="towing_front" accept="image/*" onchange="uploadAndDetectPlate(this, 'towing-front')">
-                            <small class="form-text text-muted mt-2">Upload a clear image of the vehicle (car/bike) with its license plate visible</small>
+                            <small class="form-text text-muted mt-2">Upload a clear image of the towed vehicle from left or right side with its license plate visible</small>
                             <div class="processing" id="towing-front-processing">
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                 Processing...
@@ -189,7 +189,7 @@
                 <div class="col-md-6 mb-4">
                     <div class="upload-card">
                         <div class="upload-card-header">
-                            Towing Truck Image
+                            Towing Truck Image (Vehicle From Back Side)
                         </div>
                         <div class="upload-card-body">
                             <div class="upload-preview" id="towing-rear-preview">
@@ -200,7 +200,7 @@
                                 </div>
                             </div>
                             <input type="file" class="form-control" id="towing-rear-input" name="towing_rear" accept="image/*" onchange="uploadAndDetectPlate(this, 'towing-rear')">
-                            <small class="form-text text-muted mt-2">Upload a clear image showing the back of the towing truck with its license plate visible</small>
+                            <small class="form-text text-muted mt-2">Upload a clear image showing the back side of the vehicle with towing truck's license plate visible</small>
                             <div class="processing" id="towing-rear-processing">
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                 Processing...
