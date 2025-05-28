@@ -95,7 +95,14 @@
             border-radius: 15px;
             margin-top: 10px;
             display: inline-block;
-            display: none;
+        }
+        .front-plate {
+            background-color: #20c997;
+            color: #212529;
+        }
+        .rear-plate {
+            background-color: #6f42c1;
+            color: white;
         }
         .verification-result {
             margin-top: 10px;
@@ -367,10 +374,25 @@
                 }
                 
                 // Show license plate if detected
-                if (data.license_plate) {
-                    const plateElement = document.getElementById(`${orientation}-plate`);
-                    plateElement.style.display = 'inline-block';
+                const plateElement = document.getElementById(`${orientation}-plate`);
+                plateElement.style.display = 'inline-block';
+                
+                // Check if we have multiple plates (for front and rear views)
+                if (data.multiple_plates && data.multiple_plates.length > 0 && (orientation === 'front' || orientation === 'rear')) {
+                    let plateHtml = '<div class="mt-2"><strong>Detected License Plates:</strong></div>';
+                    
+                    data.multiple_plates.forEach((plate, index) => {
+                        const plateClass = index === 0 ? 'front-plate' : 'rear-plate';
+                        plateHtml += `<div class="license-plate ${plateClass} mt-1">${plate}</div>`;
+                    });
+                    
+                    plateElement.innerHTML = plateHtml;
+                } else if (data.license_plate) {
+                    // Single plate display
                     plateElement.innerHTML = `License Plate: ${data.license_plate}`;
+                } else {
+                    // No license plate detected
+                    plateElement.innerHTML = 'No license plate detected';
                 }
                 
                 // Show model comparison if available

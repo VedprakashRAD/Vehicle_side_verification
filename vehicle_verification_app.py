@@ -159,31 +159,19 @@ def verify_image():
             # Verify orientation with dual model approach
             is_correct, confidence, predicted_class, model_comparison = verify_orientation(filepath, orientation)
             
-            # Extract license plate(s) using our improved OCR module
-            if detect_multiple:
-                multiple_plates = extract_license_plates(filepath, detect_multiple=True)
-                license_plate = multiple_plates[0] if multiple_plates else None
-                
-                # Return results with multiple plates
-                return jsonify({
-                    'is_correct': is_correct,
-                    'confidence': confidence,
-                    'license_plate': license_plate,
-                    'multiple_plates': multiple_plates,
-                    'predicted_class': predicted_class,
-                    'model_comparison': model_comparison
-                })
-            else:
-                license_plate = extract_license_plates(filepath, detect_multiple=False)
-                
-                # Return results with single plate
-                return jsonify({
-                    'is_correct': is_correct,
-                    'confidence': confidence,
-                    'license_plate': license_plate,
-                    'predicted_class': predicted_class,
-                    'model_comparison': model_comparison
-                })
+            # Always detect multiple license plates for all views
+            multiple_plates = extract_license_plates(filepath, detect_multiple=True)
+            license_plate = multiple_plates[0] if multiple_plates else None
+            
+            # Return results with multiple plates
+            return jsonify({
+                'is_correct': is_correct,
+                'confidence': confidence,
+                'license_plate': license_plate,
+                'multiple_plates': multiple_plates,
+                'predicted_class': predicted_class,
+                'model_comparison': model_comparison
+            })
         except Exception as e:
             print(f"Error processing image: {str(e)}")
             traceback.print_exc()
@@ -235,15 +223,16 @@ def vehicle_verification():
                 
                 # Extract license plate - prioritize front and rear views for license plate detection
                 if orientation in ['front', 'rear']:
-                    license_plate = extract_license_plates(filepath)
-                    if license_plate:
-                        print(f"Detected license plate from {orientation} view: {license_plate}")
-                        license_plates[orientation] = license_plate
+                    multiple_plates = extract_license_plates(filepath, detect_multiple=True)
+                    if multiple_plates:
+                        print(f"Detected license plates from {orientation} view: {multiple_plates}")
+                        license_plates[orientation] = multiple_plates[0]
                 else:
-                    # For left/right views, still attempt detection but with lower priority
-                    license_plate = extract_license_plates(filepath)
-                    if license_plate:
-                        license_plates[orientation] = license_plate
+                    # For left/right views, still attempt detection but with multiple plates
+                    multiple_plates = extract_license_plates(filepath, detect_multiple=True)
+                    if multiple_plates:
+                        print(f"Detected license plates from {orientation} view: {multiple_plates}")
+                        license_plates[orientation] = multiple_plates[0]
                 
                 vehicle_images[orientation] = filename
         

@@ -111,31 +111,28 @@ def is_valid_license_plate(text):
     # Remove spaces and special characters
     cleaned_text = re.sub(r'[^A-Z0-9]', '', text.upper())
     
-    # Check if length is appropriate for a license plate (5-10 characters)
-    if not (5 <= len(cleaned_text) <= 10):
+    # Check if length is appropriate for a license plate (4-10 characters)
+    if not (4 <= len(cleaned_text) <= 10):
         return False
     
     # Check if it has both letters and numbers (common for license plates)
     has_letters = bool(re.search(r'[A-Z]', cleaned_text))
     has_numbers = bool(re.search(r'[0-9]', cleaned_text))
     
-    # Most license plates have both letters and numbers
-    if not (has_letters and has_numbers):
-        # Some regions might have only numbers, so we'll still consider it
-        # if it's at least 5 characters long
-        if not (len(cleaned_text) >= 5):
-            return False
+    # Most license plates have both letters and numbers, but we'll be more lenient
+    # and accept plates with just letters or just numbers if they're long enough
+    if not (has_letters or has_numbers):
+        return False
     
     return True
 
-def extract_license_plates(image_path, detect_multiple=False, confidence_threshold=0.5):
+def extract_license_plates(image_path, detect_multiple=False):
     """
     Extract license plate text from an image with improved accuracy
     
     Args:
         image_path: Path to the image
         detect_multiple: If True, attempt to detect multiple plates
-        confidence_threshold: Minimum confidence score to accept a detection
         
     Returns:
         For single plate detection: The detected license plate text or None
@@ -179,7 +176,7 @@ def extract_license_plates(image_path, detect_multiple=False, confidence_thresho
                     cleaned_text = re.sub(r'[^A-Z0-9]', '', text.upper())
                     
                     # Skip if too short or confidence too low
-                    if len(cleaned_text) < 5 or prob < confidence_threshold:
+                    if len(cleaned_text) < 4 or prob < 0.3:  # Lower the threshold to catch more plates
                         continue
                     
                     # Get position information
