@@ -12,7 +12,7 @@ import re
 import traceback
 
 # Import from existing project files
-from predict import load_ensemble_model, preprocess_image, predict
+from predict import load_ensemble_model, load_single_model, preprocess_image, predict
 from utils import get_device
 from license_plate_ocr import extract_license_plates, initialize_ocr
 
@@ -34,15 +34,23 @@ initialize_ocr(['en'])
 
 # Load model
 device = get_device()
-MODEL_PATH = 'models/ensemble_model.pth'
-model, class_to_idx = None, None
+ENSEMBLE_MODEL_PATH = 'models/ensemble_model.pth'
+IMPROVED_MODEL_PATH = 'models/improved_model_final.pth'
+ensemble_model, class_to_idx = None, None
+improved_model, improved_class_to_idx = None, None
 
-def load_model():
-    global model, class_to_idx
+def load_models():
+    global ensemble_model, class_to_idx, improved_model, improved_class_to_idx
     try:
-        model, class_to_idx = load_ensemble_model(MODEL_PATH, device)
-        print("Model loaded successfully")
+        # Load ensemble model
+        ensemble_model, class_to_idx = load_ensemble_model(ENSEMBLE_MODEL_PATH, device)
+        print("Ensemble model loaded successfully")
         print(f"Class to idx mapping: {class_to_idx}")
+        
+        # Load improved model
+        improved_model, improved_class_to_idx = load_single_model(IMPROVED_MODEL_PATH, device)
+        print("Improved model loaded successfully")
+        print(f"Improved model class to idx mapping: {improved_class_to_idx}")
         
         # Ensure we have the correct mapping
         # The model expects: {'front': 0, 'left': 1, 'rear': 2, 'right': 3}
@@ -50,12 +58,16 @@ def load_model():
         
         # If the mapping is different, create a new mapping
         if class_to_idx != expected_mapping:
-            print(f"Updating class mapping from {class_to_idx} to {expected_mapping}")
+            print(f"Updating ensemble class mapping from {class_to_idx} to {expected_mapping}")
             class_to_idx = expected_mapping
+            
+        if improved_class_to_idx != expected_mapping:
+            print(f"Updating improved model class mapping from {improved_class_to_idx} to {expected_mapping}")
+            improved_class_to_idx = expected_mapping
         
         return True
     except Exception as e:
-        print(f"Error loading model: {e}")
+        print(f"Error loading models: {e}")
         traceback.print_exc()
         return False
 
@@ -63,28 +75,58 @@ def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
 def verify_orientation(image_path, expected_orientation):
-    """Verify if the image matches the expected orientation"""
-    if model is None:
-        print("Model not loaded")
-        return False, 0.0, None
+    """Verify if the image matches the expected orientation using dual model approach"""
+    if ensemble_model is None or improved_model is None:
+        print("Models not loaded")
+        return False, 0.0, None, {}
     
     try:
         # Preprocess image
         image_tensor, _ = preprocess_image(image_path, image_size=320)
         
-        # Make prediction
-        pred_class, confidence = predict(model, image_tensor, class_to_idx, device)
+        # Make predictions with both models
+        ensemble_pred_class, ensemble_confidence = predict(ensemble_model, image_tensor, class_to_idx, device)
+        improved_pred_class, improved_confidence = predict(improved_model, image_tensor, improved_class_to_idx, device)
         
-        print(f"Image: {image_path}, Expected: {expected_orientation}, Predicted: {pred_class}, Confidence: {confidence}")
+        print(f"Image: {image_path}, Expected: {expected_orientation}")
+        print(f"Ensemble model prediction: {ensemble_pred_class}, Confidence: {ensemble_confidence}")
+        print(f"Improved model prediction: {improved_pred_class}, Confidence: {improved_confidence}")
+        
+        # Create a comparison result
+        model_comparison = {
+            'ensemble': {
+                'prediction': ensemble_pred_class,
+                'confidence': ensemble_confidence
+            },
+            'improved': {
+                'prediction': improved_pred_class,
+                'confidence': improved_confidence
+            }
+        }
+        
+        # Determine final prediction
+        # If both models agree, use that prediction
+        if ensemble_pred_class == improved_pred_class:
+            final_pred_class = ensemble_pred_class
+            # Use the higher confidence score
+            final_confidence = max(ensemble_confidence, improved_confidence)
+        else:
+            # If models disagree, use the one with higher confidence
+            if ensemble_confidence > improved_confidence:
+                final_pred_class = ensemble_pred_class
+                final_confidence = ensemble_confidence
+            else:
+                final_pred_class = improved_pred_class
+                final_confidence = improved_confidence
         
         # Check if prediction matches expected orientation
         # Convert both to lowercase for case-insensitive comparison
-        is_match = pred_class.lower() == expected_orientation.lower()
-        return is_match, confidence, pred_class
+        is_match = final_pred_class.lower() == expected_orientation.lower()
+        return is_match, final_confidence, final_pred_class, model_comparison
     except Exception as e:
         print(f"Verification error: {str(e)}")
         traceback.print_exc()
-        return False, 0.0, None
+        return False, 0.0, None, {}
 
 @app.route('/')
 def index():
@@ -114,8 +156,8 @@ def verify_image():
             
             print(f"Processing image: {filepath}, Expected orientation: {orientation}, Detect multiple: {detect_multiple}")
             
-            # Verify orientation
-            is_correct, confidence, predicted_class = verify_orientation(filepath, orientation)
+            # Verify orientation with dual model approach
+            is_correct, confidence, predicted_class, model_comparison = verify_orientation(filepath, orientation)
             
             # Extract license plate(s) using our improved OCR module
             if detect_multiple:
@@ -128,7 +170,8 @@ def verify_image():
                     'confidence': confidence,
                     'license_plate': license_plate,
                     'multiple_plates': multiple_plates,
-                    'predicted_class': predicted_class
+                    'predicted_class': predicted_class,
+                    'model_comparison': model_comparison
                 })
             else:
                 license_plate = extract_license_plates(filepath, detect_multiple=False)
@@ -138,7 +181,8 @@ def verify_image():
                     'is_correct': is_correct,
                     'confidence': confidence,
                     'license_plate': license_plate,
-                    'predicted_class': predicted_class
+                    'predicted_class': predicted_class,
+                    'model_comparison': model_comparison
                 })
         except Exception as e:
             print(f"Error processing image: {str(e)}")
@@ -164,9 +208,6 @@ def vehicle_verification():
         
         # Process each orientation
         for orientation in orientations:
-            # Check for manual override
-            manual_override = request.form.get(f'{orientation}_verified') == 'true'
-            
             if orientation not in request.files:
                 flash(f'No {orientation} image uploaded')
                 continue
@@ -181,22 +222,15 @@ def vehicle_verification():
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'vehicle', filename)
                 file.save(filepath)
                 
-                # If manual override, consider it verified
-                if manual_override:
-                    is_correct = True
-                    confidence = 1.0
-                    predicted_class = orientation
-                    print(f"Manual override for {orientation} image")
-                else:
-                    # Verify orientation
-                    is_correct, confidence, predicted_class = verify_orientation(filepath, orientations[orientation])
+                # Verify orientation with dual model approach
+                is_correct, confidence, predicted_class, model_comparison = verify_orientation(filepath, orientations[orientation])
                 
                 verification_results[orientation] = {
                     'is_correct': is_correct,
                     'confidence': confidence,
                     'filepath': filepath,
                     'predicted_class': predicted_class,
-                    'manual_override': manual_override
+                    'model_comparison': model_comparison
                 }
                 
                 # Extract license plate
@@ -337,8 +371,8 @@ def complete():
                           towing_truck_plate=towing_truck_plate)
 
 if __name__ == '__main__':
-    # Load model before starting the app
-    if load_model():
+    # Load models before starting the app
+    if load_models():
         app.run(host='0.0.0.0', port=5002, debug=True)
     else:
-        print("Failed to load model. Exiting.") 
+        print("Failed to load models. Exiting.") 

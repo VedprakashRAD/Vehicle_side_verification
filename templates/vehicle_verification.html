@@ -113,11 +113,29 @@
             font-weight: bold;
             margin-top: 10px;
         }
-        .override-btn {
+        .model-comparison {
             margin-top: 10px;
-            display: none;
+            padding: 8px;
+            border-radius: 5px;
+            background-color: #f8f9fa;
             font-size: 0.85rem;
-            padding: 3px 8px;
+            display: none;
+        }
+        .model-comparison h6 {
+            font-size: 0.9rem;
+            margin-bottom: 5px;
+            color: #495057;
+        }
+        .model-comparison-item {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 3px;
+        }
+        .model-match {
+            color: #198754;
+        }
+        .model-mismatch {
+            color: #dc3545;
         }
     </style>
 </head>
@@ -164,7 +182,7 @@
                             </div>
                             <div class="verification-result" id="front-result"></div>
                             <div class="license-plate" id="front-plate"></div>
-                            <button class="btn btn-sm btn-warning override-btn" id="front-override" onclick="overrideVerification('front')">Override - Accept as Front</button>
+                            <div class="model-comparison" id="front-model-comparison"></div>
                         </div>
                     </div>
                 </div>
@@ -191,7 +209,7 @@
                             </div>
                             <div class="verification-result" id="rear-result"></div>
                             <div class="license-plate" id="rear-plate"></div>
-                            <button class="btn btn-sm btn-warning override-btn" id="rear-override" onclick="overrideVerification('rear')">Override - Accept as Rear</button>
+                            <div class="model-comparison" id="rear-model-comparison"></div>
                         </div>
                     </div>
                 </div>
@@ -218,7 +236,7 @@
                             </div>
                             <div class="verification-result" id="left-result"></div>
                             <div class="license-plate" id="left-plate"></div>
-                            <button class="btn btn-sm btn-warning override-btn" id="left-override" onclick="overrideVerification('left')">Override - Accept as Left</button>
+                            <div class="model-comparison" id="left-model-comparison"></div>
                         </div>
                     </div>
                 </div>
@@ -245,7 +263,7 @@
                             </div>
                             <div class="verification-result" id="right-result"></div>
                             <div class="license-plate" id="right-plate"></div>
-                            <button class="btn btn-sm btn-warning override-btn" id="right-override" onclick="overrideVerification('right')">Override - Accept as Right</button>
+                            <div class="model-comparison" id="right-model-comparison"></div>
                         </div>
                     </div>
                 </div>
@@ -294,9 +312,6 @@
             
             // Show processing indicator
             document.getElementById(`${orientation}-processing`).style.display = 'block';
-            
-            // Hide override button
-            document.getElementById(`${orientation}-override`).style.display = 'none';
             
             // Create FormData object
             const formData = new FormData();
@@ -348,9 +363,6 @@
                     // Show the predicted class if available
                     if (data.predicted_class) {
                         resultElement.innerHTML = `Detected as: ${data.predicted_class.toUpperCase()}<br>Confidence: ${formattedConfidence}%`;
-                        
-                        // Show override button when verification fails
-                        document.getElementById(`${orientation}-override`).style.display = 'inline-block';
                     }
                 }
                 
@@ -359,6 +371,41 @@
                     const plateElement = document.getElementById(`${orientation}-plate`);
                     plateElement.style.display = 'inline-block';
                     plateElement.innerHTML = `License Plate: ${data.license_plate}`;
+                }
+                
+                // Show model comparison if available
+                if (data.model_comparison) {
+                    const comparisonElement = document.getElementById(`${orientation}-model-comparison`);
+                    comparisonElement.style.display = 'block';
+                    
+                    const ensemble = data.model_comparison.ensemble;
+                    const improved = data.model_comparison.improved;
+                    
+                    // Format confidence values
+                    const ensembleConfidence = (ensemble.confidence * 100).toFixed(2);
+                    const improvedConfidence = (improved.confidence * 100).toFixed(2);
+                    
+                    // Determine if models agree
+                    const modelsAgree = ensemble.prediction === improved.prediction;
+                    const agreementClass = modelsAgree ? 'model-match' : 'model-mismatch';
+                    
+                    let comparisonHtml = `
+                        <h6>Model Comparison</h6>
+                        <div class="model-comparison-item">
+                            <span>Ensemble Model:</span>
+                            <span>${ensemble.prediction.toUpperCase()} (${ensembleConfidence}%)</span>
+                        </div>
+                        <div class="model-comparison-item">
+                            <span>Improved Model:</span>
+                            <span>${improved.prediction.toUpperCase()} (${improvedConfidence}%)</span>
+                        </div>
+                        <div class="model-comparison-item ${agreementClass}">
+                            <span>Agreement:</span>
+                            <span>${modelsAgree ? 'Models agree' : 'Models disagree'}</span>
+                        </div>
+                    `;
+                    
+                    comparisonElement.innerHTML = comparisonHtml;
                 }
                 
                 console.log(`${orientation} verification result:`, data);
@@ -371,37 +418,10 @@
             });
         }
         
-        function overrideVerification(orientation) {
-            // Update the badge
-            const badgeElement = document.getElementById(`${orientation}-badge`);
-            badgeElement.className = 'verification-badge verification-success';
-            badgeElement.innerHTML = 'Verified';
-            
-            // Update the result text
-            const resultElement = document.getElementById(`${orientation}-result`);
-            resultElement.innerHTML = `Manually verified as ${orientation.toUpperCase()}`;
-            
-            // Hide the override button
-            document.getElementById(`${orientation}-override`).style.display = 'none';
-            
-            // Update verification results
-            verificationResults[orientation].verified = true;
-            
-            console.log(`${orientation} verification overridden:`, verificationResults[orientation]);
-        }
-        
         // Add form submission handler to include verification results
         document.getElementById('verificationForm').addEventListener('submit', function(e) {
-            // Add hidden fields for verification results
-            for (const [orientation, result] of Object.entries(verificationResults)) {
-                if (result.verified) {
-                    const hiddenField = document.createElement('input');
-                    hiddenField.type = 'hidden';
-                    hiddenField.name = `${orientation}_verified`;
-                    hiddenField.value = 'true';
-                    this.appendChild(hiddenField);
-                }
-            }
+            // No need to add hidden fields for verification results anymore
+            // The backend will use the verification results stored in the session
         });
     </script>
 </body>
