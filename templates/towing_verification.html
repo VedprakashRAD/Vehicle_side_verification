@@ -95,7 +95,6 @@
             border-radius: 15px;
             margin-top: 10px;
             display: inline-block;
-            display: none;
         }
         .processing {
             display: none;
@@ -129,7 +128,7 @@
     <div class="container">
         <div class="header">
             <h2>Towing Verification</h2>
-            <p>Upload images of the vehicle being towed</p>
+            <p>Upload images to verify the towed vehicle and towing truck</p>
         </div>
 
         <div class="info-card mb-4">
@@ -139,10 +138,13 @@
             <div class="info-card-body">
                 <p>Please upload two clear images showing:</p>
                 <ol>
-                    <li>The towed vehicle with its license plate visible</li>
-                    <li>The towing truck with its license plate visible</li>
+                    <li><strong>Towed Vehicle Image:</strong> The vehicle (car/bike) being towed with its license plate clearly visible</li>
+                    <li><strong>Towing Truck Image:</strong> The back view of the towing truck showing both the towing truck's license plate and the towed vehicle</li>
                 </ol>
-                <p>The system will automatically detect and verify both license plates.</p>
+                <p>The system will automatically detect both license plates using OCR technology.</p>
+                <div class="alert alert-info">
+                    <strong>Tip:</strong> For the best results, ensure both license plates are clearly visible in good lighting conditions.
+                </div>
             </div>
         </div>
 
@@ -163,7 +165,7 @@
                 <div class="col-md-6 mb-4">
                     <div class="upload-card">
                         <div class="upload-card-header">
-                            Towed Vehicle
+                            Towed Vehicle Image
                         </div>
                         <div class="upload-card-body">
                             <div class="upload-preview" id="towing-front-preview">
@@ -174,7 +176,7 @@
                                 </div>
                             </div>
                             <input type="file" class="form-control" id="towing-front-input" name="towing_front" accept="image/*" onchange="uploadAndDetectPlate(this, 'towing-front')">
-                            <small class="form-text text-muted mt-2">Upload a clear image showing the towed vehicle with its license plate visible</small>
+                            <small class="form-text text-muted mt-2">Upload a clear image of the vehicle (car/bike) with its license plate visible</small>
                             <div class="processing" id="towing-front-processing">
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                 Processing...
@@ -187,7 +189,7 @@
                 <div class="col-md-6 mb-4">
                     <div class="upload-card">
                         <div class="upload-card-header">
-                            Towing Truck
+                            Towing Truck Image
                         </div>
                         <div class="upload-card-body">
                             <div class="upload-preview" id="towing-rear-preview">
@@ -198,7 +200,7 @@
                                 </div>
                             </div>
                             <input type="file" class="form-control" id="towing-rear-input" name="towing_rear" accept="image/*" onchange="uploadAndDetectPlate(this, 'towing-rear')">
-                            <small class="form-text text-muted mt-2">Upload a clear image showing the towing truck with its license plate visible</small>
+                            <small class="form-text text-muted mt-2">Upload a clear image showing the back of the towing truck with its license plate visible</small>
                             <div class="processing" id="towing-rear-processing">
                                 <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
                                 Processing...
@@ -262,6 +264,7 @@
             const formData = new FormData();
             formData.append('file', input.files[0]);
             formData.append('orientation', imageType === 'towing-front' ? 'front' : 'rear'); // Just for API compatibility
+            formData.append('detect_multiple', imageType === 'towing-rear' ? 'true' : 'false'); // Request multiple plate detection for rear image
             
             // Send AJAX request to verify the image
             fetch('/verify-image', {
@@ -273,18 +276,56 @@
                 // Hide processing indicator
                 document.getElementById(`${imageType}-processing`).style.display = 'none';
                 
-                // Show license plate if detected
-                if (data.license_plate) {
-                    const plateElement = document.getElementById(`${imageType}-plate`);
-                    plateElement.style.display = 'inline-block';
-                    plateElement.innerHTML = `License Plate: ${data.license_plate}`;
+                const plateElement = document.getElementById(`${imageType}-plate`);
+                plateElement.style.display = 'block';
+                
+                // Handle multiple license plates for towing truck image
+                if (imageType === 'towing-rear' && data.multiple_plates && data.multiple_plates.length > 0) {
+                    let plateHtml = '';
+                    
+                    // Display the first plate as towed vehicle (if there are at least 2 plates)
+                    if (data.multiple_plates.length >= 2) {
+                        plateHtml += `<div class="mb-3">
+                            <strong>Upper License Plate (Towed Vehicle):</strong>
+                            <div class="license-plate bg-primary text-white">${data.multiple_plates[0]}</div>
+                        </div>`;
+                        
+                        // Store the first plate
+                        detectedPlates['towed_vehicle_from_rear'] = data.multiple_plates[0];
+                        
+                        // Display the second plate as towing truck
+                        plateHtml += `<div>
+                            <strong>Lower License Plate (Towing Truck):</strong>
+                            <div class="license-plate">${data.multiple_plates[1]}</div>
+                        </div>`;
+                        
+                        // Store the second plate
+                        detectedPlates['towing-rear'] = data.multiple_plates[1];
+                    } else {
+                        // If only one plate is detected, assume it's the towing truck
+                        plateHtml += `<div>
+                            <strong>Detected License Plate:</strong>
+                            <div class="license-plate">${data.multiple_plates[0]}</div>
+                        </div>`;
+                        
+                        // Store the plate
+                        detectedPlates['towing-rear'] = data.multiple_plates[0];
+                    }
+                    
+                    plateElement.innerHTML = plateHtml;
+                    
+                } else if (data.license_plate) {
+                    // For single plate detection
+                    plateElement.innerHTML = `<strong>License Plate:</strong> <span class="license-plate">${data.license_plate}</span>`;
                     
                     // Store the detected plate
                     detectedPlates[imageType] = data.license_plate;
-                    
-                    // Compare plates if both are detected
-                    comparePlates();
+                } else {
+                    plateElement.innerHTML = '<span class="text-danger">No license plate detected</span>';
                 }
+                
+                // Compare plates if both are detected
+                comparePlates();
             })
             .catch(error => {
                 console.error('Error:', error);

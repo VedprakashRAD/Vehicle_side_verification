@@ -103,9 +103,8 @@
         </div>
 
         <div class="summary-card">
-            <h4>Summary</h4>
+            <h4>License Plate Information</h4>
             <div class="summary-item">
-                <h5>License Plate Detection</h5>
                 {% if vehicle_plate %}
                     <p>Towed vehicle license plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
                 {% else %}
@@ -116,6 +115,18 @@
                     <p>Towing truck license plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
                 {% else %}
                     <p>No license plate detected for the towing truck.</p>
+                {% endif %}
+
+                {% if vehicle_plate and towing_truck_plate %}
+                    {% if vehicle_plate == towing_truck_plate %}
+                        <div class="alert alert-warning mt-3">
+                            The license plates match. This suggests the same vehicle might be shown in both images.
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success mt-3">
+                            The license plates are different, confirming these are separate vehicles.
+                        </div>
+                    {% endif %}
                 {% endif %}
             </div>
         </div>

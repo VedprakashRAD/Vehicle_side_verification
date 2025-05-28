@@ -14,6 +14,7 @@ import traceback
 # Import from existing project files
 from predict import load_ensemble_model, preprocess_image, predict
 from utils import get_device
+from license_plate_ocr import extract_license_plates, initialize_ocr
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -29,7 +30,7 @@ os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'towing'), exist_ok=True)
 os.makedirs(os.path.join(app.config['UPLOAD_FOLDER'], 'temp'), exist_ok=True)  # For temporary files
 
 # Initialize OCR reader
-reader = easyocr.Reader(['en'])
+initialize_ocr(['en'])
 
 # Load model
 device = get_device()
@@ -60,35 +61,6 @@ def load_model():
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
-
-def extract_license_plate(image_path):
-    """Extract license plate text from an image using EasyOCR"""
-    try:
-        # Read image
-        image = cv2.imread(image_path)
-        if image is None:
-            return None
-        
-        # Perform OCR
-        results = reader.readtext(image)
-        
-        # Process OCR results
-        license_plates = []
-        for (bbox, text, prob) in results:
-            # Filter for potential license plates (alphanumeric, length between 5-10)
-            cleaned_text = re.sub(r'[^A-Z0-9]', '', text.upper())
-            if len(cleaned_text) >= 5 and len(cleaned_text) <= 10 and prob > 0.5:
-                license_plates.append((cleaned_text, prob))
-        
-        # Return the highest confidence result
-        if license_plates:
-            license_plates.sort(key=lambda x: x[1], reverse=True)
-            return license_plates[0][0]
-        
-        return None
-    except Exception as e:
-        print(f"OCR error: {e}")
-        return None
 
 def verify_orientation(image_path, expected_orientation):
     """Verify if the image matches the expected orientation"""
@@ -128,6 +100,7 @@ def verify_image():
     
     file = request.files['file']
     orientation = request.form.get('orientation', '')
+    detect_multiple = request.form.get('detect_multiple', 'false').lower() == 'true'
     
     if file.filename == '':
         return jsonify({'error': 'No selected file'}), 400
@@ -139,21 +112,34 @@ def verify_image():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'temp', filename)
             file.save(filepath)
             
-            print(f"Processing image: {filepath}, Expected orientation: {orientation}")
+            print(f"Processing image: {filepath}, Expected orientation: {orientation}, Detect multiple: {detect_multiple}")
             
             # Verify orientation
             is_correct, confidence, predicted_class = verify_orientation(filepath, orientation)
             
-            # Extract license plate
-            license_plate = extract_license_plate(filepath)
-            
-            # Return results
-            return jsonify({
-                'is_correct': is_correct,
-                'confidence': confidence,
-                'license_plate': license_plate,
-                'predicted_class': predicted_class
-            })
+            # Extract license plate(s) using our improved OCR module
+            if detect_multiple:
+                multiple_plates = extract_license_plates(filepath, detect_multiple=True)
+                license_plate = multiple_plates[0] if multiple_plates else None
+                
+                # Return results with multiple plates
+                return jsonify({
+                    'is_correct': is_correct,
+                    'confidence': confidence,
+                    'license_plate': license_plate,
+                    'multiple_plates': multiple_plates,
+                    'predicted_class': predicted_class
+                })
+            else:
+                license_plate = extract_license_plates(filepath, detect_multiple=False)
+                
+                # Return results with single plate
+                return jsonify({
+                    'is_correct': is_correct,
+                    'confidence': confidence,
+                    'license_plate': license_plate,
+                    'predicted_class': predicted_class
+                })
         except Exception as e:
             print(f"Error processing image: {str(e)}")
             traceback.print_exc()
@@ -214,7 +200,7 @@ def vehicle_verification():
                 }
                 
                 # Extract license plate
-                license_plate = extract_license_plate(filepath)
+                license_plate = extract_license_plates(filepath)
                 license_plates[orientation] = license_plate
                 
                 vehicle_images[orientation] = filename
@@ -261,8 +247,28 @@ def towing_verification():
                 file.save(filepath)
                 
                 # Extract license plate
-                license_plate = extract_license_plate(filepath)
-                license_plates[image_type] = license_plate
+                if image_type == 'towing_rear':
+                    # For towing truck image, try to detect multiple plates
+                    multiple_plates = extract_license_plates(filepath, detect_multiple=True)
+                    
+                    if multiple_plates and len(multiple_plates) >= 2:
+                        # If we found at least 2 plates, the top one is the towed vehicle, bottom is the towing truck
+                        license_plates['towed_vehicle_from_rear'] = multiple_plates[0]
+                        license_plates['towing_truck'] = multiple_plates[1]
+                        # Also store the single plate for backward compatibility
+                        license_plates[image_type] = multiple_plates[1]  # Use the truck plate as the primary one
+                    elif multiple_plates and len(multiple_plates) == 1:
+                        # If we only found one plate, assume it's the towing truck
+                        license_plates['towing_truck'] = multiple_plates[0]
+                        license_plates[image_type] = multiple_plates[0]
+                    else:
+                        license_plates[image_type] = None
+                else:
+                    # For towed vehicle image, just detect a single plate
+                    license_plate = extract_license_plates(filepath)
+                    license_plates[image_type] = license_plate
+                    if license_plate:
+                        license_plates['towed_vehicle'] = license_plate
                 
                 towing_images[image_type] = filename
         
@@ -293,20 +299,31 @@ def complete():
         if results and all(r.get('is_correct', False) for r in results.values()):
             vehicle_verified = True
     
-    # Get consistent license plate
+    # Get license plates
     vehicle_plates = session.get('license_plates', {})
     towing_plates = session.get('towing_license_plates', {})
     
-    # Find most common license plate from vehicle images
-    all_plates = [plate for plate in vehicle_plates.values() if plate]
-    vehicle_plate = max(set(all_plates), key=all_plates.count) if all_plates else None
+    # Get vehicle plate - prioritize the one from vehicle verification
+    vehicle_plate = None
+    if vehicle_plates:
+        # Find most common license plate from vehicle images
+        all_plates = [plate for plate in vehicle_plates.values() if plate]
+        vehicle_plate = max(set(all_plates), key=all_plates.count) if all_plates else None
     
-    # Get towing truck plate directly from the towing_rear image
-    towing_truck_plate = towing_plates.get('towing_rear')
+    # If no vehicle plate from vehicle verification, try the one from towing verification
+    if not vehicle_plate:
+        vehicle_plate = towing_plates.get('towed_vehicle')
+        
+        # If still no plate, try the one detected from the rear image (top plate)
+        if not vehicle_plate:
+            vehicle_plate = towing_plates.get('towed_vehicle_from_rear')
     
-    # If no towing_rear plate, check towing_front as a fallback
+    # Get towing truck plate
+    towing_truck_plate = towing_plates.get('towing_truck')
+    
+    # If no specific towing truck plate, fall back to the towing_rear plate
     if not towing_truck_plate:
-        towing_truck_plate = towing_plates.get('towing_front')
+        towing_truck_plate = towing_plates.get('towing_rear')
     
     # Print debug info
     print(f"Vehicle plates: {vehicle_plates}")
@@ -322,6 +339,6 @@ def complete():
 if __name__ == '__main__':
     # Load model before starting the app
     if load_model():
-        app.run(host='0.0.0.0', port=5001, debug=True)
+        app.run(host='0.0.0.0', port=5002, debug=True)
     else:
         print("Failed to load model. Exiting.") 

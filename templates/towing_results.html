@@ -66,34 +66,41 @@
             text-align: center;
             margin-top: 30px;
         }
-        .summary-card {
+        .plate-info-card {
             border-radius: 15px;
             box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
             margin-bottom: 30px;
-        }
-        .summary-card-header {
-            background-color: #0d6efd;
-            color: white;
-            padding: 15px;
-            border-radius: 15px 15px 0 0;
-            font-weight: bold;
-        }
-        .summary-card-body {
+            background-color: #fff;
             padding: 20px;
         }
-        .plate-comparison {
-            background-color: #e9ecef;
-            padding: 15px;
-            border-radius: 10px;
-            margin-top: 15px;
+        .plate-info {
+            display: flex;
+            justify-content: space-around;
+            align-items: center;
+            flex-wrap: wrap;
+        }
+        .plate-item {
+            text-align: center;
+            margin: 10px;
+            flex: 1;
+            min-width: 200px;
+        }
+        .plate-label {
+            font-weight: bold;
+            margin-bottom: 10px;
+            font-size: 1.1rem;
         }
         .plate-match {
             color: #198754;
             font-weight: bold;
+            margin-top: 15px;
+            text-align: center;
         }
         .plate-mismatch {
             color: #dc3545;
             font-weight: bold;
+            margin-top: 15px;
+            text-align: center;
         }
     </style>
 </head>
@@ -104,49 +111,65 @@
             <p>License plate detection results for towing images</p>
         </div>
 
-        <div class="summary-card">
-            <div class="summary-card-header">
-                Summary
-            </div>
-            <div class="summary-card-body">
-                <h5>License Plate Detection</h5>
-                
-                {% set vehicle_plate = None %}
-                {% set towing_truck_plate = None %}
-                
-                {% for image_type, plate in license_plates.items() %}
-                    {% if image_type == 'towing_front' and plate %}
-                        {% set vehicle_plate = plate %}
-                    {% endif %}
-                    {% if image_type == 'towing_rear' and plate %}
-                        {% set towing_truck_plate = plate %}
-                    {% endif %}
-                {% endfor %}
-                
-                {% if vehicle_plate %}
-                    <p>Towed Vehicle License Plate: <span class="license-plate">{{ vehicle_plate }}</span></p>
-                {% else %}
-                    <p class="text-danger">No license plate detected for the towed vehicle.</p>
-                {% endif %}
-                
-                {% if towing_truck_plate %}
-                    <p>Towing Truck License Plate: <span class="license-plate">{{ towing_truck_plate }}</span></p>
-                {% else %}
-                    <p class="text-danger">No license plate detected for the towing truck.</p>
-                {% endif %}
+        {% set vehicle_plate = None %}
+        {% set vehicle_plate_from_rear = None %}
+        {% set towing_truck_plate = None %}
+        
+        {% for image_type, plate in license_plates.items() %}
+            {% if image_type == 'towing_front' and plate %}
+                {% set vehicle_plate = plate %}
+            {% endif %}
+            {% if image_type == 'towed_vehicle' and plate %}
+                {% set vehicle_plate = plate %}
+            {% endif %}
+            {% if image_type == 'towed_vehicle_from_rear' and plate %}
+                {% set vehicle_plate_from_rear = plate %}
+            {% endif %}
+            {% if image_type == 'towing_truck' and plate %}
+                {% set towing_truck_plate = plate %}
+            {% endif %}
+        {% endfor %}
+        
+        {# Use vehicle_plate_from_rear as fallback if no vehicle_plate #}
+        {% if not vehicle_plate and vehicle_plate_from_rear %}
+            {% set vehicle_plate = vehicle_plate_from_rear %}
+        {% endif %}
+
+        {% if vehicle_plate or towing_truck_plate %}
+            <div class="plate-info-card">
+                <h4 class="mb-4">License Plate Detection Results</h4>
+                <div class="plate-info">
+                    <div class="plate-item">
+                        <div class="plate-label">Towed Vehicle License Plate</div>
+                        {% if vehicle_plate %}
+                            <div class="license-plate">{{ vehicle_plate }}</div>
+                        {% else %}
+                            <div class="text-danger">Not detected</div>
+                        {% endif %}
+                    </div>
+                    
+                    <div class="plate-item">
+                        <div class="plate-label">Towing Truck License Plate</div>
+                        {% if towing_truck_plate %}
+                            <div class="license-plate">{{ towing_truck_plate }}</div>
+                        {% else %}
+                            <div class="text-danger">Not detected</div>
+                        {% endif %}
+                    </div>
+                </div>
                 
                 {% if vehicle_plate and towing_truck_plate %}
-                    <div class="plate-comparison">
-                        <h6>Plate Comparison</h6>
+                    <div class="alert {% if vehicle_plate == towing_truck_plate %}alert-warning{% else %}alert-success{% endif %} mt-4">
+                        <h5 class="mb-2">Plate Comparison</h5>
                         {% if vehicle_plate == towing_truck_plate %}
-                            <p class="plate-match">The license plates match! This suggests the same vehicle might be shown in both images.</p>
+                            <p class="mb-0"><strong>Warning:</strong> The license plates match! This suggests the same vehicle might be shown in both images.</p>
                         {% else %}
-                            <p class="plate-mismatch">The license plates are different, confirming these are separate vehicles (towed vehicle and towing truck).</p>
+                            <p class="mb-0"><strong>Verified:</strong> The license plates are different, confirming these are separate vehicles (towed vehicle and towing truck).</p>
                         {% endif %}
                     </div>
                 {% endif %}
             </div>
-        </div>
+        {% endif %}
 
         <div class="row">
             {% for image_type, filename in images.items() %}
@@ -154,24 +177,54 @@
                     <div class="result-card">
                         <div class="result-card-header">
                             {% if image_type == 'towing_front' %}
-                                Towed Vehicle
+                                Towed Vehicle Image
                             {% else %}
-                                Towing Truck
+                                Towing Truck Image
                             {% endif %}
                         </div>
                         <div class="result-card-body">
                             <div class="result-image">
                                 <img src="/uploads/towing/{{ filename }}" alt="{{ image_type }}">
                             </div>
-                            {% if license_plates[image_type] %}
-                                <div class="mt-3">
-                                    <strong>Detected License Plate:</strong>
-                                    <div class="license-plate">{{ license_plates[image_type] }}</div>
-                                </div>
+                            
+                            {% if image_type == 'towing_rear' %}
+                                {% if license_plates['towed_vehicle_from_rear'] or license_plates['towing_truck'] %}
+                                    <div class="mt-3">
+                                        {% if license_plates['towed_vehicle_from_rear'] %}
+                                            <div class="mb-2">
+                                                <strong>Upper License Plate (Towed Vehicle):</strong>
+                                                <div class="license-plate">{{ license_plates['towed_vehicle_from_rear'] }}</div>
+                                            </div>
+                                        {% endif %}
+                                        
+                                        {% if license_plates['towing_truck'] %}
+                                            <div>
+                                                <strong>Lower License Plate (Towing Truck):</strong>
+                                                <div class="license-plate">{{ license_plates['towing_truck'] }}</div>
+                                            </div>
+                                        {% endif %}
+                                    </div>
+                                {% elif license_plates[image_type] %}
+                                    <div class="mt-3">
+                                        <strong>Detected License Plate:</strong>
+                                        <div class="license-plate">{{ license_plates[image_type] }}</div>
+                                    </div>
+                                {% else %}
+                                    <div class="mt-3 text-danger">
+                                        <strong>No license plate detected</strong>
+                                    </div>
+                                {% endif %}
                             {% else %}
-                                <div class="mt-3 text-danger">
-                                    <strong>No license plate detected</strong>
-                                </div>
+                                {% if license_plates[image_type] %}
+                                    <div class="mt-3">
+                                        <strong>Detected Vehicle License Plate:</strong>
+                                        <div class="license-plate">{{ license_plates[image_type] }}</div>
+                                    </div>
+                                {% else %}
+                                    <div class="mt-3 text-danger">
+                                        <strong>No license plate detected</strong>
+                                    </div>
+                                {% endif %}
                             {% endif %}
                         </div>
                     </div>
